@@ -4,6 +4,10 @@
 #include <ESP32Tone.h>
 #include <ESP32PWM.h>
 
+#include <WiFi.h>
+
+WiFiServer server(80);
+
 /* Sweep
  by BARRAGAN <http://barraganstudio.com>
  This example code is in the public domain.
@@ -71,10 +75,18 @@ char receivedChars[numChars];
 
 boolean newData = false;
 
+void initWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin("MeMech", "AbelCable");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("ESP Ready");
 	// Allow allocation of all timers
 	ESP32PWM::allocateTimer(0);
 	ESP32PWM::allocateTimer(1);
@@ -86,102 +98,49 @@ void setup() {
 	// different servos may require different min/max settings
 	// for an accurate 0 to 180 sweep
 
-pinMode(buttonPin, INPUT);
-lastButtonState = digitalRead(buttonPin);
+  pinMode(buttonPin, INPUT);
+  lastButtonState = digitalRead(buttonPin);
+
+  initWiFi();
+
+  server.begin();
+
+
 }
 
 
 void loop() {
-  recvWithStartEndMarkers();
-  doorResponse();
   buttonState = digitalRead(buttonPin);
 
-  if (buttonState != lastButtonState) {
-    if (buttonState == HIGH) {
-      if (pos == 0) {
-        pos = 120;
-      } else {
-        pos = 0;
+  WiFiClient client = server.available();
+  if (client) {
+    
+    // Read the data from the client
+    while (client.connected()) {
+      if (client.available()) {
+        String data = client.readStringUntil('\n');
+        Serial.println(data);
       }
-      myservo.write(pos);
-      delay(150); // Debounce delay
-    }
-    lastButtonState = buttonState;
-  }
-}
-
-void recvWithStartEndMarkers() {
-  static boolean recvInProgress = false;
-  static byte ndx = 0;
-  char startMarker = '<';
-  char endMarker = '>';
-  char rc
-
-  const int numChars = 5;
-  char receivedChars[numChars];
-  bool newData = false;
-
-
-  while (Serial.available() > 0 && newData == false) {
-    rc = Serial.read();
-
-    if (recvInProgress == true) {
-      if (rc != endMarker) {
-        receivedChars[ndx] = rc;
-        ndx++;
-        if (ndx >= numChars) {
-          recvInProgress = false;
-          newData = true;
-        }
-      }else {
-        recvInProgress = false;
-        newData = true;
-      }
-    } else if (rc == startMarker) {
-      ndx = 0;
-      recvInProgress = true;
     }
   }
 
-  if (newData) {
-    // Count occurrences of each character
-    int charCount[256] = {0}; // Assuming ASCII characters
+  char human = Serial.read();
 
-    for (byte i = 0; i < numChars; i++) {
-      charCount[receivedChars[i]]++;
-    }
+  Serial.println(human);
 
-    // Find the most frequent character
-    char mostFrequentChar = 0;
-    int maxCount = 0;
-
-    for (int i = 0; i < 256; i++) {
-      if (charCount[i] > maxCount) {
-        maxCount = charCount[i];
-        mostFrequentChar = static_cast<char>(i);
-      }
-    }
-
-    // Print the result
-    Serial.print("Most frequent character: ");
-    Serial.println(mostFrequentChar);
-
-    newData = false; // Reset the newData flag
+  //this means wheelchair
+  if (human == 0){
+    myservo.write(120);
+    delay(10000);
+    myservo.write(0);
+  }
+  //this means normal people
+  else if (human == 1){
+    myservo.write(120);
+    delay(5000);
+    myservo.write(0);
   }
 }
 
-void doorResponse() {
-  
-}
-// **OG sweep code**
-// 	for (pos = 0; pos <= 180; pos += 2) { // goes from 0 degrees to 180 degrees
-// 		// in steps of 1 degree
-// 		myservo.write(pos);    // tell servo to go to position in variable 'pos'
-// 		delay(5);             // waits 15ms for the servo to reach the position
-// 	}
-// 	for (pos = 180; pos >= 0; pos -= 2) { // goes from 180 degrees to 0 degrees
-// 		myservo.write(pos);    // tell servo to go to position in variable 'pos'
-// 		delay(5);             // waits 15ms for the servo to reach the position
-// 	}
-// }
+
 

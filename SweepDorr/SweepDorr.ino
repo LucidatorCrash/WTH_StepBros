@@ -78,15 +78,18 @@ boolean newData = false;
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin("MeMech", "AbelCable");
+  Serial.print("Connecting to WiFi ..");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(1000);
   }
+  Serial.println(WiFi.localIP());
 }
 
 void setup() {
   Serial.begin(115200);
   delay(200);
+  Serial.println("ESP Ready");
 	// Allow allocation of all timers
 	ESP32PWM::allocateTimer(0);
 	ESP32PWM::allocateTimer(1);
@@ -102,6 +105,9 @@ void setup() {
   lastButtonState = digitalRead(buttonPin);
 
   initWiFi();
+  Serial.print("RRSI: ");
+  Serial.println(WiFi.RSSI());
+  Serial.println(WiFi.localIP());
 
   server.begin();
 
@@ -114,19 +120,21 @@ void loop() {
 
   WiFiClient client = server.available();
   if (client) {
+    Serial.println("Client connected");
     
     // Read the data from the client
     while (client.connected()) {
       if (client.available()) {
         String data = client.readStringUntil('\n');
         Serial.println(data);
+
+        // Send a response back to the client
+        client.println("Data received!");
       }
     }
   }
 
   char human = Serial.read();
-
-  Serial.println(human);
 
   //this means wheelchair
   if (human == 0){
@@ -140,6 +148,8 @@ void loop() {
     delay(5000);
     myservo.write(0);
   }
+
+
 }
 
 
